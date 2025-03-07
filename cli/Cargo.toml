@@ -1,0 +1,11 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+itemizer = { path = "../itemizer" }
+
+clap = { version="4.5.31", features=["derive"] }
+
+

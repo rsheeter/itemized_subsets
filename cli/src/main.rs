@@ -1,7 +1,5 @@
 use clap::Parser;
-use cli::{fonts::{FontIdentifier, Fonts}, fonts_xml::Familyset, graphemes, itemize};
 
-/// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -12,10 +10,6 @@ struct Args {
     /// The language to prefer when breaking ties, particularly crucial for CJK due to Han unification
     #[arg(short, long, default_value = "")]
     lang: String,
-
-    /// Where to look for fonts, such as a Google Fonts github path
-    #[arg(short, long)]
-    fonts_dir: String,
 }
 
 fn main() {
@@ -37,8 +31,6 @@ fn main() {
             }
         }
     }
-
-    
 
     itemize(&args.text, fonts);
 

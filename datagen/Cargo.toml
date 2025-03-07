@@ -1,0 +1,12 @@
+[package]
+name = "datagen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+itertools = "0.14.0"
+quick-xml = "0.37"
+smol_str.workspace = true
+walkdir = "2.5.0"
+reqwest = { version = "0.12.12", features=["blocking"] }
+regex = { version = "1.11.1", features = ["std"] }

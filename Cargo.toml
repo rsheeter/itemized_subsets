@@ -1,13 +1,12 @@
-[package]
-name = "cli"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
+[workspace.dependencies]
 clap = { version="4.5.31", features=["derive"] }
-icu_segmenter = "1.5.0"
-itertools = "0.14.0"
-quick-xml = "0.37"
-skrifa = "0.28.1"
 smol_str = "0.3.2"
-walkdir = "2.5.0"
+
+[workspace]
+resolver = "3"
+
+members = [
+    "datagen",
+    "itemizer",
+    "cli",
+]
