@@ -7,7 +7,7 @@ use quick_xml::{Reader, events::Event};
 const FONTS_XML: &str = include_str!("../third_party/fonts.xml");
 
 #[derive(Debug, Clone)]
-pub(crate) struct Familyset(pub(crate) Vec<Entry>);
+pub struct Familyset(pub(crate) Vec<Entry>);
 
 #[derive(Debug, Clone)]
 pub(crate) enum Entry {
@@ -16,15 +16,15 @@ pub(crate) enum Entry {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Alias {
-    pub(crate) name: Option<String>,
-    pub(crate) to: Option<String>,
-    pub(crate) weight: Option<i32>,
+pub struct Alias {
+    pub name: Option<String>,
+    pub to: Option<String>,
+    pub weight: Option<i32>,
 }
 
 /// <https://developer.android.com/ndk/reference/group/font>
 #[derive(Default, Debug, Clone)]
-pub(crate) enum Style {
+pub enum Style {
     #[default]
     Normal,
     Italic,
@@ -32,7 +32,7 @@ pub(crate) enum Style {
 
 /// <https://developer.android.com/ndk/reference/group/font>
 #[derive(Default, Debug, Clone)]
-pub(crate) enum Variant {
+pub enum Variant {
     #[default]
     Default,
     Compact,
@@ -40,21 +40,21 @@ pub(crate) enum Variant {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Family {
-    pub(crate) name: Option<String>,
-    pub(crate) lang: Option<String>,
-    pub(crate) variant: Variant,
-    pub(crate) fonts: Vec<Font>,
+pub struct Family {
+    pub name: Option<String>,
+    pub variant: Variant,
+    pub lang: Option<String>,
+    pub fonts: Vec<Font>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Font {
-    pub(crate) weight: i32,
-    pub(crate) index: Option<i32>,
-    pub(crate) filename: String,
-    pub(crate) style: Style,
-    pub(crate) fallback_for: Option<String>,
-    pub(crate) post_script_name: Option<String>,
+pub struct Font {
+    pub weight: i32,
+    pub index: Option<i32>,
+    pub filename: String,
+    pub style: Style,
+    pub fallback_for: Option<String>,
+    pub post_script_name: Option<String>,
 }
 
 // Since these are always from FONTS_XML they should be able to be &'static str
@@ -82,7 +82,7 @@ fn optional_number(raw: &[u8]) -> Option<i32> {
 }
 
 impl Familyset {
-    pub(crate) fn from_fonts_xml() -> Self {
+    pub fn from_fonts_xml() -> Self {
         let mut reader = Reader::from_str(FONTS_XML);
         reader.config_mut().trim_text(true);
 
@@ -218,5 +218,16 @@ impl Familyset {
         println!("{} fonts.xml entries", entries.len());
 
         Familyset(entries)
+    }
+
+    pub fn fallbacks(&self) -> Vec<&Family> {
+        self
+        .0
+        .iter()
+        .filter_map(|e| match e {
+            Entry::Family(f) => Some(f),
+            Entry::Alias(_) => None,
+        })
+        .collect()
     }
 }

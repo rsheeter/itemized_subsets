@@ -2,12 +2,19 @@
 
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
+use smol_str::SmolStr;
 use walkdir::WalkDir;
 
-pub struct Fonts(HashMap<String, PathBuf>);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FontIdentifier {
+    Filename(SmolStr),
+    PostscriptName(SmolStr),
+}
+
+pub struct Fonts(HashMap<FontIdentifier, PathBuf>);
 
 impl Fonts {
     pub fn from_dir(d: &str) -> Self {
@@ -27,11 +34,17 @@ impl Fonts {
             if !(filename.ends_with(".ttf") || filename.ends_with(".otf")) {
                 continue;
             }
-            if map.insert(filename, e.path().to_path_buf()).is_some() {
+            
+            if map.insert(FontIdentifier::Filename(filename.into()), e.path().to_path_buf()).is_some() {
                 eprintln!("Multiple files named {:?} :(", e.file_name());
             }
+
         }
         println!("{} font files", map.len());
         Self(map)
+    }
+
+    pub fn contains(&self, identifier: &FontIdentifier) -> bool {
+        self.0.contains_key(identifier)
     }
 }
