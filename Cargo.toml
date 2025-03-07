@@ -8,3 +8,4 @@ clap = { version="4.5.31", features=["derive"] }
 icu_segmenter = "1.5.0"
 itertools = "0.14.0"
 quick-xml = "0.37"
+walkdir = "2.5.0"

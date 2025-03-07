@@ -7,7 +7,7 @@ use quick_xml::{Reader, events::Event};
 const FONTS_XML: &str = include_str!("../third_party/fonts.xml");
 
 #[derive(Debug, Clone)]
-pub(crate) struct Familyset(Vec<Entry>);
+pub(crate) struct Familyset(pub(crate) Vec<Entry>);
 
 #[derive(Debug, Clone)]
 pub(crate) enum Entry {
@@ -17,9 +17,9 @@ pub(crate) enum Entry {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Alias {
-    name: Option<String>,
-    to: Option<String>,
-    weight: Option<i32>,
+    pub(crate) name: Option<String>,
+    pub(crate) to: Option<String>,
+    pub(crate) weight: Option<i32>,
 }
 
 /// <https://developer.android.com/ndk/reference/group/font>
@@ -41,20 +41,20 @@ pub(crate) enum Variant {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Family {
-    name: Option<String>,
-    lang: Option<String>,
-    variant: Variant,
-    fonts: Vec<Font>,
+    pub(crate) name: Option<String>,
+    pub(crate) lang: Option<String>,
+    pub(crate) variant: Variant,
+    pub(crate) fonts: Vec<Font>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Font {
-    weight: i32,
-    index: Option<i32>,
-    filename: String,
-    style: Style,
-    fallback_for: Option<String>,
-    post_script_name: Option<String>,
+    pub(crate) weight: i32,
+    pub(crate) index: Option<i32>,
+    pub(crate) filename: String,
+    pub(crate) style: Style,
+    pub(crate) fallback_for: Option<String>,
+    pub(crate) post_script_name: Option<String>,
 }
 
 // Since these are always from FONTS_XML they should be able to be &'static str
@@ -101,7 +101,6 @@ impl Familyset {
                 ),
                 Ok(Event::Eof) => break,
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    eprintln!("{:?}", from_utf8(e.name().local_name().into_inner()));
                     match e.name().local_name().into_inner() {
                         b"familyset" => {
                             num_familysets += 1;
@@ -216,10 +215,7 @@ impl Familyset {
             }
         }
 
-        for entry in entries.iter() {
-            println!("{entry:#?}");
-        }
-        println!("{} entries", entries.len());
+        println!("{} fonts.xml entries", entries.len());
 
         Familyset(entries)
     }

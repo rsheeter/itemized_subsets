@@ -5,5 +5,6 @@ aimed at producing subset Google Fonts requests.
 ```shell
 # 世界 - world in Japanese per Translate
 # ❤️‍🔥 - a multicodepoint zwj sequence, https://emojipedia.org/heart-on-fire#technical
-$ cargo run -- --text "Hello 世界 ❤️‍🔥"
+# Where ~/oss/fonts is a clone of https://github.com/google/fonts
+$ cargo run -- --text "Hello 世界 ❤️‍🔥" --fonts-dir ~/oss/fonts
 ```
