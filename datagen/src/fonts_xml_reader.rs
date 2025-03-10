@@ -1,10 +1,11 @@
 //! Quick and dirty exposure of fonts.xml (from Android) to Rust
 
-use std::str::from_utf8;
+use std::str::{FromStr, from_utf8};
 
 use quick_xml::{Reader, events::Event};
+use skrifa::Tag;
 
-use crate::fonts_xml::{Alias, Entry, Family, Familyset, Font, Style, Variant};
+use crate::fonts_xml::{Alias, AxisPosition, Entry, Family, Familyset, Font, Style, Variant};
 
 const FONTS_XML: &str = include_str!("../../third_party/fonts.xml");
 
@@ -20,7 +21,7 @@ fn optional_string(raw: &[u8]) -> Option<String> {
     )
 }
 
-fn optional_number(raw: &[u8]) -> Option<i32> {
+fn optional_number(raw: &[u8]) -> Option<f32> {
     if raw.is_empty() {
         return None;
     }
@@ -63,6 +64,7 @@ pub(crate) fn bundled_fonts_xml() -> Familyset {
                     let mut name = Default::default();
                     let mut lang = Default::default();
                     let mut variant = Variant::Default;
+                    let mut ignore = false;
                     for attr in e.attributes() {
                         let Ok(attr) = attr else {
                             panic!("Bundled fonts.xml is defective?! {attr:?}");
@@ -77,13 +79,15 @@ pub(crate) fn bundled_fonts_xml() -> Familyset {
                                     v => panic!("Unknown variant {:?}", from_utf8(v)),
                                 }
                             }
-                            _ => (),
+                            b"ignore" => ignore = b"true" == &*attr.value,
+                            v => panic!("Unknown family attribute {:?}", from_utf8(v)),
                         }
                     }
 
                     entries.push(Entry::Family(Family {
                         name,
                         lang,
+                        ignore,
                         variant,
                         fonts: Vec::new(),
                     }));
@@ -115,11 +119,12 @@ pub(crate) fn bundled_fonts_xml() -> Familyset {
                     }
                     font_in_progress = Some(Font {
                         weight,
-                        index,
+                        index: index.map(|i| i as i32),
                         filename: String::default(),
                         style,
                         fallback_for,
                         post_script_name,
+                        location: Vec::new(),
                     })
                 }
                 b"alias" => {
@@ -140,7 +145,24 @@ pub(crate) fn bundled_fonts_xml() -> Familyset {
                     entries.push(Entry::Alias(Alias { name, to, weight }));
                 }
                 b"axis" => {
-                    eprintln!("TODO axis");
+                    let mut tag = Default::default();
+                    let mut value = Default::default();
+                    let Some(font) = font_in_progress.as_mut() else {
+                        panic!("Malformed fonts.xml?");
+                    };
+                    for attr in e.attributes() {
+                        let Ok(attr) = attr else {
+                            panic!("Bundled fonts.xml is defective?! {attr:?}");
+                        };
+                        match attr.key.0 {
+                            b"tag" => {
+                                tag = Tag::from_str(&optional_string(&attr.value).unwrap()).unwrap()
+                            }
+                            b"stylevalue" => value = optional_number(&attr.value).unwrap(),
+                            v => panic!("Unknown axis attribute {:?}", from_utf8(v)),
+                        }
+                    }
+                    font.location.push(AxisPosition { tag, value });
                 }
                 v => panic!("Unsupported {:?}", from_utf8(v)),
             },

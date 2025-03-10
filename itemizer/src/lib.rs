@@ -1,17 +1,15 @@
 //! Exploratory hackery
 
-use itertools::Itertools;
+pub(crate) mod error;
+pub mod fallback_chain;
 
-use icu_segmenter::GraphemeClusterSegmenter;
+use fallback_chain::Family;
 
-pub fn graphemes(s: &str) -> Vec<&str> {
-    GraphemeClusterSegmenter::new()
-        .segment_str(s)
-        .tuple_windows()
-        .map(|(i, j)| &s[i..j])
-        .collect()
+pub use crate::error::Error;
+
+#[derive(Debug, Clone)]
+pub struct Run<'a> {
+    family: &'a Family,
+    start: usize,
+    end: usize,
 }
-
-// pub fn itemize(fallbacks: Vec<&Family>, fonts: Fonts) {
-//     eprintln!("{} fallbacks", fallbacks.len());
-// }

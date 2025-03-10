@@ -13,30 +13,5 @@ struct Args {
 }
 
 fn main() {
-    let args = Args::parse();
-    let fonts = Fonts::from_dir(&args.fonts_dir);
-
-    let familyset = Familyset::from_fonts_xml();
-    let fallbacks = familyset.fallbacks();
-
-    let mut contains = 0;
-    let mut missing = 0;
-    for fallback in fallbacks {
-        for font in fallback.fonts.iter() {
-            if fonts.contains(&FontIdentifier::Filename(font.filename.as_str().into())) {
-                contains += 1;
-            } else {
-                missing += 1;
-                eprintln!("Unable to locate {}", font.filename);
-            }
-        }
-    }
-
-    itemize(&args.text, fonts);
-
-    println!("{contains}/{} fallback fonts located", contains + missing);
-
-    for s in graphemes(&args.text) {
-        println!("{} codepoints: {s}", s.chars().count());
-    }
+    let _args = Args::parse();
 }
