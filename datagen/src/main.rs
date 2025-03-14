@@ -54,6 +54,7 @@ fn named_chain(familyset: &Familyset, font_binaries: &FontBinaries, head: &str) 
             itemizer::fallback_chain::Family {
                 family_name: family_name.0,
                 lang: family.lang.as_deref().map(|s| s.into()),
+                codepoints: Default::default(),
             }
         })
         .collect::<Vec<_>>();
@@ -99,10 +100,18 @@ fn main() {
     let sans_chain = named_chain(&familyset, &fonts, "sans-serif");
 
     let text = "Hello 世界 ❤️‍🔥";
-    let mut dest = Vec::new();
-    sans_chain.itemize(text, "und-Latn", &mut dest).unwrap();
-    eprintln!("Runs for {text}");
-    for run in dest {
-        eprintln!("{run:?}");
+    for lang in vec!["und-Latn", "ja"] {
+        let mut dest = Vec::new();
+        sans_chain.itemize(text, lang, &mut dest).unwrap();
+        eprintln!("Runs for {text}, lang={lang}");
+        for run in dest {
+            eprintln!(
+                "({}..{}) \"{}\" in {}",
+                run.start,
+                run.end,
+                &text[run.start..run.end],
+                run.family.family_name
+            );
+        }
     }
 }

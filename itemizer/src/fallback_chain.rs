@@ -1,6 +1,9 @@
 //! A font fallback chain, against which one might itemize some text.
 
-use std::{cmp::Ordering, collections::{HashMap, HashSet}};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeSet, HashMap, HashSet},
+};
 
 use icu_segmenter::GraphemeClusterSegmenter;
 use itertools::Itertools;
@@ -15,6 +18,7 @@ struct FontIdx(usize);
 pub struct Family {
     pub family_name: SmolStr,
     pub lang: Option<SmolStr>,
+    pub codepoints: BTreeSet<u32>,
 }
 
 #[derive(Debug)]
@@ -32,7 +36,11 @@ pub struct FallbackChain {
 }
 
 impl FallbackChain {
-    pub fn for_fonts(name: &str, families: Vec<Family>, codepoints: impl Fn(&Family) -> HashSet<u32>) -> Self {
+    pub fn for_fonts(
+        name: &str,
+        mut families: Vec<Family>,
+        codepoints: impl Fn(&Family) -> HashSet<u32>,
+    ) -> Self {
         let codepoints = families.iter().map(|f| codepoints(f)).collect::<Vec<_>>();
 
         let font_indices = (0..families.len())
@@ -41,9 +49,9 @@ impl FallbackChain {
 
         // Map each codepoint to the families that support it
         let mut families_by_cp = HashMap::<u32, HashSet<&Family>>::new();
-        for (font, codepoints) in families.iter().zip(codepoints) {
+        for (font, codepoints) in families.iter().zip(codepoints.iter()) {
             for cp in codepoints {
-                families_by_cp.entry(cp).or_default().insert(font);
+                families_by_cp.entry(*cp).or_default().insert(font);
             }
         }
 
@@ -140,33 +148,89 @@ impl FallbackChain {
             num_unambiguous
         );
 
-        FallbackChain { name: name.into(), families: families, mappings }
+        for (family, codepoints) in families.iter_mut().zip(codepoints.into_iter()) {
+            family.codepoints = codepoints.into_iter().collect();
+        }
+
+        FallbackChain {
+            name: name.into(),
+            families,
+            mappings,
+        }
     }
 
-    pub fn itemize<'chain, 'text>(&'chain self, text: &'text str, lang: &str, dest: &mut Vec<Run<'chain>>) -> Result<(), Error> {
+    // TODO: match Android, test as much
+    fn score(family: &Family, lang: &str, grapheme: &str) -> i32 {
+        // TODO: handle fe0f properly
+        if grapheme
+            .chars()
+            .filter(|cp| (*cp as u32) != 0xfe0f)
+            .any(|cp| !family.codepoints.contains(&(cp as u32)))
+        {
+            return i32::MIN;
+        }
+        let mut score = 0; // full support, no other clues
+        if Some(lang) == family.lang.as_deref() {
+            score = i32::MAX;
+        }
+        score
+    }
+
+    pub fn itemize<'chain, 'text>(
+        &'chain self,
+        text: &'text str,
+        lang: &str,
+        dest: &mut Vec<Run<'chain>>,
+    ) -> Result<(), Error> {
         dest.clear();
-        for (start, end) in GraphemeClusterSegmenter::new().segment_str(text).tuple_windows() {
+        for (start, end) in GraphemeClusterSegmenter::new()
+            .segment_str(text)
+            .tuple_windows()
+        {
             let grapheme = &text[start..end];
             let mut chars = grapheme.chars();
-            let mut family: Option<&'chain Family> = None;
             let mut match_type = "unattempted";
             let Some(first) = chars.next() else {
+                debug_assert!(false, "empty grapheme?!");
                 continue;
             };
-            if let Some(second) = chars.next() {
-                eprintln!("TODO: multichar grapheme {grapheme}");
-            } else {
-                // Single char grapheme, see if exactly one family supports it
-                family = self.mappings.binary_search_by(|m| match first as u32 {
-                    first if m.start > first => Ordering::Greater,
-                    first if m.end < first => Ordering::Less,
-                    _ => Ordering::Equal,
-                }).ok()
-                .map(|mapping_idx| &self.families[self.mappings[mapping_idx].font.0]);
-                match_type = "direct";
 
-                if family.is_none() {
-                    eprintln!("TODO: resolve {grapheme} by probe");
+            let mut family: Option<&'chain Family> = None;
+
+            if chars.next().is_none() {
+                // Single char grapheme, see if exactly one family supports it
+                family = self
+                    .mappings
+                    .binary_search_by(|m| match first as u32 {
+                        first if m.start > first => Ordering::Greater,
+                        first if m.end < first => Ordering::Less,
+                        _ => Ordering::Equal,
+                    })
+                    .ok()
+                    .map(|mapping_idx| &self.families[self.mappings[mapping_idx].font.0]);
+                match_type = "jump";
+            }
+
+            if family.is_none() {
+                // Walk the chain to find the best match that supports the entire grapheme
+                let mut winner = &self.families[0];
+                let mut score = Self::score(&winner, lang, grapheme);
+                for candidate in self.families.iter().skip(1) {
+                    let candidate_score = Self::score(candidate, lang, grapheme);
+                    if candidate_score > score {
+                        winner = candidate;
+                        score = candidate_score;
+                    }
+                    if score == i32::MAX {
+                        // can't beat that
+                        break;
+                    }
+                }
+                if score > i32::MIN {
+                    family = Some(winner);
+                    match_type = "walk";
+                } else {
+                    match_type = "walk_to_eof";
                 }
             }
 
@@ -178,22 +242,28 @@ impl FallbackChain {
                         end: start,
                     });
                 }
-                let mut curr = dest.last_mut().unwrap();
 
+                let mut curr = dest.last_mut().unwrap();
+                let mut op = "continue";
                 if curr.family == family && curr.end == start {
                     curr.end = end;
-                    eprintln!("{grapheme} {match_type} => {:?} (continue)", curr);
                 } else {
-                    dest.push(Run {
-                        family,
-                        start,
-                        end,
-                    });
+                    dest.push(Run { family, start, end });
                     curr = dest.last_mut().unwrap();
-                    eprintln!("{grapheme} {match_type} => {:?} (insert)", curr);
+                    op = "insert";
                 }
+                eprintln!(
+                    "{grapheme} {match_type} => {} ({}..{}) {} ({op})",
+                    &text[curr.start..curr.end],
+                    curr.start,
+                    curr.end,
+                    curr.family.family_name
+                );
             } else {
-                eprintln!("{grapheme} {match_type}, failed");
+                eprintln!(
+                    "{grapheme} ({} codepoints) {match_type}, failed",
+                    grapheme.chars().count()
+                );
             }
         }
         Ok(())

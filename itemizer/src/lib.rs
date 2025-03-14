@@ -9,7 +9,7 @@ pub use crate::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct Run<'a> {
-    family: &'a Family,
-    start: usize,
-    end: usize,
+    pub family: &'a Family,
+    pub start: usize,
+    pub end: usize,
 }
